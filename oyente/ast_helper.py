@@ -1,3 +1,4 @@
+import global_params
 from utils import run_command
 from ast_walker import AstWalker
 import json

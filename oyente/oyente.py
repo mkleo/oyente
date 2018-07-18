@@ -13,9 +13,19 @@ import global_params
 from utils import run_command
 from input_helper import InputHelper
 
+def set_solc_command(args):
+    if (args.solc_version):
+        if args.solc_version in global_params.AVAILABLE_SOLC_VERSIONS:
+            return "%s/solc.%s" % (global_params.SOLC_CUSTOM_PATH, args.solc_version)
+        else:
+            return global_params.SOLC_PATH
+    else:
+        return global_params.SOLC_PATH
+
 def cmd_exists(cmd):
-    return subprocess.call("type " + cmd, shell=True,
+    result = subprocess.call("type " + cmd, shell=True,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE) == 0
+    return result
 
 def compare_versions(version1, version2):
     def normalize(v):
@@ -27,7 +37,7 @@ def compare_versions(version1, version2):
     else:
         return (version1 > version2) - (version1 < version2)
 
-def has_dependencies_installed():
+def has_dependencies_installed(args):
     try:
         import z3
         import z3.z3util
@@ -50,14 +60,16 @@ def has_dependencies_installed():
         if compare_versions(evm_version, tested_evm_version) > 0:
             logging.warning("You are using evm version %s. The supported version is %s" % (evm_version, tested_evm_version))
 
-    if not cmd_exists("solc"):
+    global_params.SOLC_PATH = set_solc_command(args)
+
+    if not cmd_exists(global_params.SOLC_PATH):
         logging.critical("solc is missing. Please install the solidity compiler and make sure solc is in the path.")
         return False
     else:
-        cmd = "solc --version"
+        cmd = "%s --version" % global_params.SOLC_PATH
         out = run_command(cmd).strip()
         solc_version = re.findall(r"Version: (\d*.\d*.\d*)", out)[0]
-        tested_solc_version = '0.4.19'
+        tested_solc_version = '0.4.21'
         if compare_versions(solc_version, tested_solc_version) > 0:
             logging.warning("You are using solc version %s, The latest supported version is %s" % (solc_version, tested_solc_version))
 
@@ -94,6 +106,7 @@ def run_solidity_analysis(inputs):
 
         if return_code == 1:
             exit_code = 1
+
     return results, exit_code
 
 def analyze_solidity(input_type='solidity'):
@@ -111,7 +124,18 @@ def analyze_solidity(input_type='solidity'):
 
     if global_params.WEB:
         six.print_(json.dumps(results))
+
+    if global_params.STORE_RESULT:
+        write_results(results)
+
     return exit_code
+
+def write_results(results):
+    global args
+    result_file = args.source + '.json'
+
+    with open(result_file, 'w') as of:
+        of.write(json.dumps(results, indent=1))
 
 def main():
     # TODO: Implement -o switch.
@@ -124,6 +148,7 @@ def main():
     group.add_argument("-s",  "--source",    type=str, help="local source file name. Solidity by default. Use -b to process evm instead. Use stdin to read from stdin.")
     group.add_argument("-ru", "--remoteURL", type=str, help="Get contract from remote URL. Solidity by default. Use -b to process evm instead.", dest="remote_URL")
 
+    parser.add_argument( "-sv", "--solc-version", type=str, help="Use explicit version of solc", action="store", dest="solc_version")
     parser.add_argument("--version", action="version", version="oyente version 0.2.7 - Commonwealth")
 
     parser.add_argument("-rmp", "--remap",          help="Remap directory paths", action="store", type=str)
@@ -151,6 +176,7 @@ def main():
     parser.add_argument( "-ce",  "--compilation-error",      help="Display compilation errors", action="store_true")
     parser.add_argument( "-gtc", "--generate-test-cases",    help="Generate test cases each branch of symbolic execution tree", action="store_true")
     parser.add_argument( "-sjo", "--standard-json-output",   help="Support Standard JSON output", action="store_true")
+    parser.add_argument( "-ubcl", "--uncovered-byte-code-lines", help="Output lines of code that contain untested bytecode", action="store_true")
 
     args = parser.parse_args()
 
@@ -180,6 +206,7 @@ def main():
     global_params.DEBUG_MODE = 1 if args.debug else 0
     global_params.GENERATE_TEST_CASES = 1 if args.generate_test_cases else 0
     global_params.PARALLEL = 1 if args.parallel else 0
+    global_params.UNCOVERED_BYTE_CODE_LINES = 1 if args.uncovered_byte_code_lines else 0
 
     if args.depth_limit:
         global_params.DEPTH_LIMIT = args.depth_limit
@@ -194,7 +221,7 @@ def main():
         if args.global_timeout:
             global_params.GLOBAL_TIMEOUT = args.global_timeout
 
-    if not has_dependencies_installed():
+    if not has_dependencies_installed(args):
         return
 
     if args.remote_URL:

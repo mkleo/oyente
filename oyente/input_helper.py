@@ -126,7 +126,7 @@ class InputHelper:
         FNULL = open(os.devnull, 'w')
         cmd = "cat %s" % self.source
         p1 = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=FNULL)
-        cmd = "solc --allow-paths %s --standard-json" % self.allow_paths
+        cmd = "%s --allow-paths %s --standard-json" % (global_params.SOLC_PATH, self.allow_paths)
         p2 = subprocess.Popen(shlex.split(cmd), stdin=p1.stdout, stdout=subprocess.PIPE, stderr=FNULL)
         p1.stdout.close()
         out = p2.communicate()[0]

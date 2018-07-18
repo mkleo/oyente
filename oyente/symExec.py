@@ -2299,6 +2299,33 @@ def detect_vulnerabilities():
             else:
                 raise Exception("Assertion checks need a Source Map")
 
+        if global_params.UNCOVERED_BYTE_CODE_LINES:
+            unchecked_instruction_keys = sorted(list(set(instructions.keys()).difference(visited_pcs)))
+            unchecked_lines = set()
+            partially_unchecked_lines = set()
+            for pc in unchecked_instruction_keys:
+                try:
+                    g_src_map.instr_positions[pc]
+                except:
+                    continue
+                loc = g_src_map.get_location(pc)
+                for i in range(loc['begin']['line'], loc['end']['line'] + 1):
+                    unchecked_lines.add(i)
+
+            for pc in visited_pcs:
+                loc = g_src_map.get_location(pc)
+                for i in range(loc['begin']['line'], loc['end']['line'] + 1):
+                    if i in unchecked_lines:
+                        unchecked_lines.remove(i)
+                        partially_unchecked_lines.add(i)
+
+            unchecked_lines = sorted(list([i + 1 for i in unchecked_lines]))
+            partially_unchecked_lines = sorted(list([i + 1 for i in partially_unchecked_lines]))
+
+            print("Unvisited instructions: " + str(unchecked_instruction_keys))
+            print("Unchecked lines: " + str(unchecked_lines))
+            print("Partially unchecked lines: " + str(partially_unchecked_lines))
+
         if g_src_map:
             log_info()
 
@@ -2353,17 +2380,6 @@ def vulnerability_found():
         if vul.is_vulnerable():
             return 1
     return 0
-
-def closing_message():
-    global g_disasm_file
-    global results
-
-    log.info("\t====== Analysis Completed ======")
-    if global_params.STORE_RESULT:
-        result_file = g_disasm_file.split('.evm.disasm')[0] + '.json'
-        with open(result_file, 'w') as of:
-            of.write(json.dumps(results, indent=1))
-        log.info("Wrote results to %s.", result_file)
 
 class TimeoutError(Exception):
     pass
@@ -2456,5 +2472,5 @@ def run(disasm_file=None, source_file=None, source_map=None):
         log.info("\t============ Results ===========")
         analyze()
         ret = detect_vulnerabilities()
-        closing_message()
+        log.info("\t====== Analysis Completed ======")
         return ret

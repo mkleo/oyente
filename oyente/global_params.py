@@ -1,3 +1,6 @@
+import os
+import subprocess
+
 # enable reporting of the result
 REPORT_MODE = 0
 
@@ -54,3 +57,16 @@ GENERATE_TEST_CASES = 0
 
 # Run Oyente in parallel
 PARALLEL = 0
+
+# Output lines of code that contain untested bytecode
+UNCOVERED_BYTE_CODE_LINES = 0
+
+# an array of all supported solc versions in the container
+AVAILABLE_SOLC_VERSIONS = ['0.4.21','0.4.20','0.4.19','0.4.18','0.4.17','0.4.16','0.4.15','0.4.14','0.4.13','0.4.12','0.4.11','0.4.10']
+
+if "SOLC_CUSTOM_PATH" in os.environ:
+    SOLC_CUSTOM_PATH = os.environ['SOLC_CUSTOM_PATH']
+else:
+    SOLC_CUSTOM_PATH = "/oyente/solc"
+
+SOLC_PATH = subprocess.check_output(['which', 'solc'], universal_newlines=True).rstrip()
